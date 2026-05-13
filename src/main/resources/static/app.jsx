@@ -1,5 +1,14 @@
 const { useEffect, useMemo, useState } = React;
 
+const defaultCurveForm = {
+  p: 79,
+  a: -3,
+  b: 1,
+  gx: 76,
+  gy: 46,
+  n: 81,
+};
+
 const emptyEncryption = {
   command: "MOVE_FORWARD",
   parameter: 10,
@@ -17,6 +26,16 @@ function pointText(point) {
   return `(${point.x}, ${point.y})`;
 }
 
+function curvePayload(form) {
+  return {
+    p: Number(form.p),
+    a: Number(form.a),
+    b: Number(form.b),
+    g: { x: Number(form.gx), y: Number(form.gy), infinity: false },
+    n: form.n === "" ? null : Number(form.n),
+  };
+}
+
 async function api(path, payload) {
   const response = await fetch(path, {
     method: "POST",
@@ -32,6 +51,7 @@ async function api(path, payload) {
 
 function App() {
   const [mode, setMode] = useState("encrypt");
+  const [curveForm, setCurveForm] = useState(defaultCurveForm);
   const [curve, setCurve] = useState(null);
   const [curveError, setCurveError] = useState("");
   const [encryptForm, setEncryptForm] = useState(emptyEncryption);
@@ -40,21 +60,53 @@ function App() {
   const [decryptResult, setDecryptResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingCurve, setCheckingCurve] = useState(false);
 
   useEffect(() => {
     fetch("/api/ecc/curve")
       .then((response) => response.json())
-      .then(setCurve)
+      .then((data) => {
+        setCurve(data);
+        setCurveForm({
+          p: data.p,
+          a: data.a,
+          b: data.b,
+          gx: data.g.x,
+          gy: data.g.y,
+          n: data.n,
+        });
+      })
       .catch(() => setCurveError("Не вдалося завантажити параметри кривої"));
   }, []);
 
   const commands = useMemo(() => curve?.commands || [], [curve]);
+  const activeCurve = useMemo(() => curvePayload(curveForm), [curveForm]);
+
+  async function validateCurve() {
+    setCheckingCurve(true);
+    setCurveError("");
+    setError("");
+    try {
+      const result = await api("/api/ecc/curve/validate", activeCurve);
+      setCurve(result);
+      setEncryptResult(null);
+      setDecryptResult(null);
+      if (!result.commands.some((item) => item.command === encryptForm.command)) {
+        setEncryptForm({ ...encryptForm, command: result.commands[0]?.command || "STOP" });
+      }
+    } catch (event) {
+      setCurveError(event.message);
+    } finally {
+      setCheckingCurve(false);
+    }
+  }
 
   async function encrypt() {
     setLoading(true);
     setError("");
     try {
       const result = await api("/api/ecc/encrypt", {
+        curve: activeCurve,
         command: encryptForm.command,
         parameter: encryptForm.parameter === "" ? null : Number(encryptForm.parameter),
       });
@@ -87,6 +139,7 @@ function App() {
       }
 
       const result = await api("/api/ecc/decrypt", {
+        curve: activeCurve,
         tx: { x: txX, y: txY, infinity: false },
         k,
       });
@@ -105,9 +158,9 @@ function App() {
           <p className="eyebrow">Дипломний демонстратор</p>
           <h1>ECC-шифрування команд управління</h1>
           <p>
-            Навчально-демонстраційний веб-застосунок для підсистеми управління
-            віддаленим рухомим об'єктом. Команда перетворюється на точку Tm,
-            маскується точкою kG і передається як криптограма Tx.
+            Користувач може змінювати параметри кривої над полем Fp, перевіряти
+            базову точку G, автоматично будувати таблицю команд і проходити
+            шифрування або дешифрування за формулами еліптичних кривих.
           </p>
         </div>
         <div className="formula-panel">
@@ -120,7 +173,14 @@ function App() {
 
       <section className="layout">
         <aside>
-          <CurvePanel curve={curve} error={curveError} />
+          <CurvePanel
+            curve={curve}
+            form={curveForm}
+            setForm={setCurveForm}
+            error={curveError}
+            onValidate={validateCurve}
+            loading={checkingCurve}
+          />
           <CommandTable commands={commands} />
         </aside>
 
@@ -160,23 +220,43 @@ function App() {
   );
 }
 
-function CurvePanel({ curve, error }) {
+function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
+  function update(name, value) {
+    setForm({ ...form, [name]: value });
+  }
+
   return (
     <section className="panel">
       <h2>Параметри еліптичної кривої</h2>
-      {error && <p className="muted">{error}</p>}
+      <div className="curve-grid">
+        <label>p<input type="number" value={form.p} onChange={(e) => update("p", e.target.value)} /></label>
+        <label>a<input type="number" value={form.a} onChange={(e) => update("a", e.target.value)} /></label>
+        <label>b<input type="number" value={form.b} onChange={(e) => update("b", e.target.value)} /></label>
+        <label>G.x<input type="number" value={form.gx} onChange={(e) => update("gx", e.target.value)} /></label>
+        <label>G.y<input type="number" value={form.gy} onChange={(e) => update("gy", e.target.value)} /></label>
+        <label>n<input type="number" value={form.n} onChange={(e) => update("n", e.target.value)} /></label>
+      </div>
+      <button className="primary full" onClick={onValidate} disabled={loading}>
+        {loading ? "Перевірка..." : "Перевірити криву"}
+      </button>
+
+      {error && <div className="error compact">{error}</div>}
       {!curve ? (
         <p className="muted">Завантаження...</p>
       ) : (
-        <dl className="details">
+        <dl className="details curve-status">
           <div><dt>Рівняння</dt><dd>{curve.equation}</dd></div>
-          <div><dt>p</dt><dd>{curve.p}</dd></div>
-          <div><dt>a</dt><dd>{curve.a}</dd></div>
-          <div><dt>b</dt><dd>{curve.b}</dd></div>
           <div><dt>G</dt><dd>{pointText(curve.g)}</dd></div>
-          <div><dt>n</dt><dd>{curve.n}</dd></div>
+          <div><dt>Точок на кривій</dt><dd>{curve.pointCount}</dd></div>
+          <div><dt>Порядок G</dt><dd>{curve.subgroupOrder}</dd></div>
+          <div><dt>Поле</dt><dd>{curve.primeField ? "p просте" : "p не просте"}</dd></div>
+          <div><dt>Стан кривої</dt><dd>{curve.nonsingular ? "несингулярна" : "сингулярна"}</dd></div>
         </dl>
       )}
+      <p className="note">
+        Таблиця команд нижче будується автоматично: для кожного m шукається
+        допустима найближча точка Tm на поточній кривій.
+      </p>
     </section>
   );
 }

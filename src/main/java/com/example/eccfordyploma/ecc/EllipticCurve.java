@@ -57,6 +57,12 @@ public class EllipticCurve {
     return left.equals(right);
   }
 
+  public boolean isNonsingular() {
+    BigInteger discriminant = BigInteger.valueOf(4).multiply(a.pow(3))
+        .add(BigInteger.valueOf(27).multiply(b.pow(2)));
+    return !mod(discriminant).equals(BigInteger.ZERO);
+  }
+
   public EcPoint add(EcPoint first, EcPoint second) {
     if (first.infinity()) {
       return second;

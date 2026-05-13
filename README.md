@@ -52,10 +52,44 @@ Content-Type: application/json
 
 ```json
 {
+  "curve": {
+    "p": 79,
+    "a": -3,
+    "b": 1,
+    "g": {
+      "x": 76,
+      "y": 46,
+      "infinity": false
+    },
+    "n": 81
+  },
   "command": "MOVE_FORWARD",
   "parameter": 10
 }
 ```
+
+### Перевірка власної кривої
+
+```http
+POST /api/ecc/curve/validate
+Content-Type: application/json
+```
+
+```json
+{
+  "p": 97,
+  "a": 2,
+  "b": 3,
+  "g": {
+    "x": 3,
+    "y": 6,
+    "infinity": false
+  },
+  "n": null
+}
+```
+
+Якщо `n` не передано, застосунок сам обчислить порядок точки `G`.
 
 ### Дешифрування
 
@@ -66,6 +100,17 @@ Content-Type: application/json
 
 ```json
 {
+  "curve": {
+    "p": 79,
+    "a": -3,
+    "b": 1,
+    "g": {
+      "x": 76,
+      "y": 46,
+      "infinity": false
+    },
+    "n": 81
+  },
   "tx": {
     "x": 76,
     "y": 33,
@@ -101,3 +146,22 @@ Tm = Tx + (-Tk) = (3, 16)
 - `src/main/java/com/example/eccfordyploma/service/EccDemoService.java` - логіка шифрування і дешифрування
 - `src/main/java/com/example/eccfordyploma/api/EccController.java` - REST API
 - `src/main/resources/static` - React-фронтенд
+
+## Універсальна логіка кривої
+
+У веб-інтерфейсі можна змінювати:
+
+```text
+p, a, b, G.x, G.y, n
+```
+
+Після натискання `Перевірити криву` backend перевіряє:
+
+- `p` є простим числом;
+- крива не є сингулярною, тобто `4a^3 + 27b^2 != 0 mod p`;
+- базова точка `G` належить кривій;
+- якщо `n` задано, тоді `nG = O` і `n` збігається з порядком точки `G`.
+
+Таблиця команд `command -> Tm` будується автоматично для поточної кривої.
+Для кожного числового коду `m` застосунок шукає допустиму найближчу точку
+`Tm`, тому дешифрування відновлює команду через цю ж таблицю.

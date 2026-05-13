@@ -25,7 +25,12 @@ public class EccController {
 
   @GetMapping("/curve")
   public CurveInfoResponse curve() {
-    return service.curveInfo();
+    return service.defaultCurveInfo();
+  }
+
+  @PostMapping("/curve/validate")
+  public CurveInfoResponse validateCurve(@RequestBody(required = false) CurveRequest request) {
+    return service.curveInfo(request);
   }
 
   @PostMapping("/encrypt")
@@ -33,7 +38,7 @@ public class EccController {
     if (request == null) {
       throw new IllegalArgumentException("Потрібно передати JSON із командою");
     }
-    return service.encrypt(request.command(), request.parameter());
+    return service.encrypt(request.curve(), request.command(), request.parameter());
   }
 
   @PostMapping("/decrypt")
@@ -41,7 +46,7 @@ public class EccController {
     if (request == null) {
       throw new IllegalArgumentException("Потрібно передати JSON із Tx та k");
     }
-    return service.decrypt(request.tx(), request.k());
+    return service.decrypt(request.curve(), request.tx(), request.k());
   }
 }
 

@@ -2,5 +2,5 @@ package com.example.eccfordyploma.api;
 
 import java.math.BigInteger;
 
-public record DecryptRequest(PointDto tx, BigInteger k) {
+public record DecryptRequest(CurveRequest curve, PointDto tx, BigInteger k) {
 }

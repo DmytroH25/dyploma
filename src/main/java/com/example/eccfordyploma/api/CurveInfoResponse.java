@@ -9,6 +9,10 @@ public record CurveInfoResponse(
     BigInteger b,
     PointDto g,
     BigInteger n,
+    BigInteger pointCount,
+    BigInteger subgroupOrder,
+    boolean primeField,
+    boolean nonsingular,
     String equation,
     List<CommandInfo> commands
 ) {
