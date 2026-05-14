@@ -172,6 +172,17 @@ dd {
   font-size: 13px;
 }
 
+.row.command-editor {
+  grid-template-columns: minmax(118px, 1fr) 32px minmax(58px, 72px) minmax(58px, 72px);
+  align-items: center;
+}
+
+.row.command-editor input {
+  min-height: 34px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
 .row span {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -302,6 +313,10 @@ select:focus {
   line-height: 1.45;
 }
 
+.table-action {
+  margin: 0 0 10px;
+}
+
 .result {
   margin-top: 22px;
   padding-top: 18px;
@@ -351,5 +366,9 @@ select:focus {
   .row {
     grid-template-columns: minmax(110px, 1fr) 30px minmax(72px, 1fr);
     font-size: 12px;
+  }
+
+  .row.command-editor {
+    grid-template-columns: minmax(102px, 1fr) 28px minmax(52px, 1fr) minmax(52px, 1fr);
   }
 }

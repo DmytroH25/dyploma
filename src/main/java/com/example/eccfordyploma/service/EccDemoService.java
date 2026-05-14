@@ -45,12 +45,17 @@ public class EccDemoService {
   }
 
   public CurveInfoResponse curveInfo(CurveRequest request) {
-    CurveContext context = buildContext(request);
+    CurveContext context = buildContext(request, null);
     return toCurveInfo(context);
   }
 
-  public EncryptResponse encrypt(CurveRequest request, String command, BigInteger parameter) {
-    CurveContext context = buildContext(request);
+  public EncryptResponse encrypt(
+      CurveRequest request,
+      List<CommandInfo> commandPoints,
+      String command,
+      BigInteger parameter
+  ) {
+    CurveContext context = buildContext(request, commandPoints);
     CommandMapping mapping = findCommand(context, command);
 
     // Tk masks the command point; Tx is the point transmitted as the cryptogram.
@@ -75,8 +80,8 @@ public class EccDemoService {
     );
   }
 
-  public DecryptResponse decrypt(CurveRequest request, PointDto txDto, BigInteger k) {
-    CurveContext context = buildContext(request);
+  public DecryptResponse decrypt(CurveRequest request, List<CommandInfo> commandPoints, PointDto txDto, BigInteger k) {
+    CurveContext context = buildContext(request, commandPoints);
     if (txDto == null) {
       throw new IllegalArgumentException("Потрібно передати точку криптограми Tx");
     }
@@ -113,7 +118,7 @@ public class EccDemoService {
     );
   }
 
-  private CurveContext buildContext(CurveRequest request) {
+  private CurveContext buildContext(CurveRequest request, List<CommandInfo> commandPoints) {
     CurveRequest normalized = request == null
         ? new CurveRequest(DEFAULT_P, DEFAULT_A, DEFAULT_B, PointDto.from(DEFAULT_G), DEFAULT_N)
         : request;
@@ -122,7 +127,9 @@ public class EccDemoService {
     validateCurve(curve, normalized.n() != null);
     BigInteger subgroupOrder = normalized.n() == null ? computeOrder(curve, curve.g()) : normalized.n();
     BigInteger pointCount = countPoints(curve);
-    Map<String, CommandMapping> byCommand = buildCommandTable(curve);
+    Map<String, CommandMapping> byCommand = commandPoints == null || commandPoints.isEmpty()
+        ? buildCommandTable(curve)
+        : buildManualCommandTable(curve, commandPoints);
     Map<EcPoint, CommandMapping> byPoint = new LinkedHashMap<>();
     byCommand.values().forEach(mapping -> byPoint.put(mapping.tm(), mapping));
 
@@ -177,6 +184,37 @@ public class EccDemoService {
     Set<EcPoint> used = new LinkedHashSet<>();
     for (CommandName command : COMMANDS) {
       EcPoint tm = findNearestPoint(curve, command.m(), used);
+      CommandMapping mapping = new CommandMapping(command.command(), command.m(), tm);
+      mappings.put(command.command(), mapping);
+      used.add(tm);
+    }
+    return mappings;
+  }
+
+  private Map<String, CommandMapping> buildManualCommandTable(EllipticCurve curve, List<CommandInfo> commandPoints) {
+    Map<String, CommandInfo> byName = new LinkedHashMap<>();
+    for (CommandInfo item : commandPoints) {
+      if (item.command() != null) {
+        byName.put(item.command().trim().toUpperCase(), item);
+      }
+    }
+
+    Map<String, CommandMapping> mappings = new LinkedHashMap<>();
+    Set<EcPoint> used = new LinkedHashSet<>();
+    for (CommandName command : COMMANDS) {
+      CommandInfo item = byName.get(command.command());
+      if (item == null || item.tm() == null || item.tm().x() == null || item.tm().y() == null) {
+        throw new IllegalArgumentException("Для команди " + command.command() + " потрібно задати точку Tm");
+      }
+
+      EcPoint tm = item.tm().toPoint();
+      if (!curve.contains(tm)) {
+        throw new IllegalArgumentException("Точка Tm для " + command.command() + " не належить поточній кривій");
+      }
+      if (used.contains(tm)) {
+        throw new IllegalArgumentException("Кілька команд не можуть мати однакову точку Tm");
+      }
+
       CommandMapping mapping = new CommandMapping(command.command(), command.m(), tm);
       mappings.put(command.command(), mapping);
       used.add(tm);

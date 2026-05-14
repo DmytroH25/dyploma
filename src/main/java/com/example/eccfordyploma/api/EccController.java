@@ -38,7 +38,7 @@ public class EccController {
     if (request == null) {
       throw new IllegalArgumentException("Потрібно передати JSON із командою");
     }
-    return service.encrypt(request.curve(), request.command(), request.parameter());
+    return service.encrypt(request.curve(), request.commandPoints(), request.command(), request.parameter());
   }
 
   @PostMapping("/decrypt")
@@ -46,7 +46,7 @@ public class EccController {
     if (request == null) {
       throw new IllegalArgumentException("Потрібно передати JSON із Tx та k");
     }
-    return service.decrypt(request.curve(), request.tx(), request.k());
+    return service.decrypt(request.curve(), request.commandPoints(), request.tx(), request.k());
   }
 }
 

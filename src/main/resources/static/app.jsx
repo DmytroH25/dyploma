@@ -198,6 +198,33 @@ function snapNearestPoint(form) {
   }, points[0]);
 }
 
+function nearestAvailablePoint(form, targetX, used) {
+  const points = validPointsForCurve(form);
+  const available = points.filter((point) => !used.has(`${point.x}:${point.y}`));
+  if (available.length === 0) return points[0];
+  return available.reduce((best, point) => {
+    const score = Math.abs(point.x - targetX);
+    const bestScore = Math.abs(best.x - targetX);
+    if (score !== bestScore) return score < bestScore ? point : best;
+    return point.y < best.y ? point : best;
+  }, available[0]);
+}
+
+function normalizeCommandTable(form, commands) {
+  const points = validPointsForCurve(form);
+  if (points.length === 0 || commands.length === 0) return commands;
+
+  const used = new Set();
+  return commands.map((item) => {
+    const current = item.tm ? { x: Number(item.tm.x), y: Number(item.tm.y) } : null;
+    let point = current && containsPoint(form, current) && !used.has(`${current.x}:${current.y}`)
+      ? current
+      : nearestAvailablePoint(form, current?.x ?? item.m, used);
+    used.add(`${point.x}:${point.y}`);
+    return { ...item, tm: { x: point.x, y: point.y, infinity: false } };
+  });
+}
+
 async function api(path, payload) {
   const response = await fetch(path, {
     method: "POST",
@@ -215,6 +242,7 @@ function App() {
   const [mode, setMode] = useState("encrypt");
   const [curveForm, setCurveForm] = useState(defaultCurveForm);
   const [curve, setCurve] = useState(null);
+  const [commandPoints, setCommandPoints] = useState([]);
   const [curveError, setCurveError] = useState("");
   const [encryptForm, setEncryptForm] = useState(emptyEncryption);
   const [decryptForm, setDecryptForm] = useState(emptyDecryption);
@@ -229,6 +257,7 @@ function App() {
       .then((response) => response.json())
       .then((data) => {
         setCurve(data);
+        setCommandPoints(data.commands || []);
         setCurveForm({
           p: data.p,
           a: data.a,
@@ -241,7 +270,15 @@ function App() {
       .catch(() => setCurveError("Не вдалося завантажити параметри кривої"));
   }, []);
 
+  useEffect(() => {
+    setCommandPoints((current) => normalizeCommandTable(curveForm, current));
+  }, [curveForm.p, curveForm.a, curveForm.b]);
+
   const commands = useMemo(() => curve?.commands || [], [curve]);
+  const activeCommands = useMemo(
+    () => (commandPoints.length > 0 ? commandPoints : commands),
+    [commandPoints, commands]
+  );
   const activeCurve = useMemo(() => curvePayload(curveForm), [curveForm]);
 
   async function validateCurve() {
@@ -251,6 +288,7 @@ function App() {
     try {
       const result = await api("/api/ecc/curve/validate", activeCurve);
       setCurve(result);
+      setCommandPoints(result.commands || []);
       setEncryptResult(null);
       setDecryptResult(null);
       if (!result.commands.some((item) => item.command === encryptForm.command)) {
@@ -269,6 +307,7 @@ function App() {
     try {
       const result = await api("/api/ecc/encrypt", {
         curve: activeCurve,
+        commandPoints: activeCommands,
         command: encryptForm.command,
         parameter: encryptForm.parameter === "" ? null : Number(encryptForm.parameter),
       });
@@ -302,6 +341,7 @@ function App() {
 
       const result = await api("/api/ecc/decrypt", {
         curve: activeCurve,
+        commandPoints: activeCommands,
         tx: { x: txX, y: txY, infinity: false },
         k,
       });
@@ -343,7 +383,11 @@ function App() {
             onValidate={validateCurve}
             loading={checkingCurve}
           />
-          <CommandTable commands={commands} />
+          <CommandTable
+            commands={activeCommands}
+            curveForm={curveForm}
+            setCommands={setCommandPoints}
+          />
         </aside>
 
         <section className="workspace">
@@ -360,7 +404,7 @@ function App() {
 
           {mode === "encrypt" ? (
             <EncryptionForm
-              commands={commands}
+              commands={activeCommands}
               form={encryptForm}
               setForm={setEncryptForm}
               onSubmit={encrypt}
@@ -402,19 +446,23 @@ function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
   }
 
   function updatePointCoordinate(name, value) {
-    if (value === "") {
-      setForm({ ...form, [name]: value });
+    setForm({ ...form, [name]: value });
+  }
+
+  function commitPointCoordinate(name) {
+    const rawValue = form[name];
+    if (rawValue === "") {
       return;
     }
 
-    const nextValue = Number(value);
+    const nextValue = Number(rawValue);
     if (!Number.isInteger(nextValue)) {
       return;
     }
 
     const previousX = integerOrNull(form.gx) ?? 0;
     const previousY = integerOrNull(form.gy) ?? 0;
-    const draft = { ...form, [name]: value };
+    const draft = { ...form, [name]: rawValue };
     const snapped = name === "gx"
       ? snapPointByX(draft, nextValue, previousX, previousY)
       : snapPointByY(draft, nextValue, previousX, previousY);
@@ -423,6 +471,14 @@ function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
       setForm(withPointAndOrder(draft, snapped));
     } else {
       setForm(draft);
+    }
+  }
+
+  function commitPointCoordinateOnEnter(event, name) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitPointCoordinate(name);
+      event.currentTarget.blur();
     }
   }
 
@@ -440,8 +496,8 @@ function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
         <label>p<input type="number" value={form.p} onChange={(e) => update("p", e.target.value)} /></label>
         <label>a<input type="number" value={form.a} onChange={(e) => update("a", e.target.value)} /></label>
         <label>b<input type="number" value={form.b} onChange={(e) => update("b", e.target.value)} /></label>
-        <label>G.x<input type="number" min="0" max={Number(form.p) - 1} step="1" value={form.gx} onChange={(e) => updatePointCoordinate("gx", e.target.value)} /></label>
-        <label>G.y<input type="number" min="0" max={Number(form.p) - 1} step="1" value={form.gy} onChange={(e) => updatePointCoordinate("gy", e.target.value)} /></label>
+        <label>G.x<input type="number" min="0" max={Number(form.p) - 1} step="1" value={form.gx} onChange={(e) => updatePointCoordinate("gx", e.target.value)} onBlur={() => commitPointCoordinate("gx")} onKeyDown={(e) => commitPointCoordinateOnEnter(e, "gx")} /></label>
+        <label>G.y<input type="number" min="0" max={Number(form.p) - 1} step="1" value={form.gy} onChange={(e) => updatePointCoordinate("gy", e.target.value)} onBlur={() => commitPointCoordinate("gy")} onKeyDown={(e) => commitPointCoordinateOnEnter(e, "gy")} /></label>
         <label>n<input type="number" value={form.n} onChange={(e) => update("n", e.target.value)} /></label>
       </div>
       <button className="secondary full" onClick={snapCurrentPoint}>
@@ -472,20 +528,116 @@ function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
   );
 }
 
-function CommandTable({ commands }) {
+function CommandTable({ commands, curveForm, setCommands }) {
+  function updateCommandPoint(index, coordinate, value) {
+    setCommands((current) => {
+      const source = current.length > 0 ? current : commands;
+      const next = source.map((item) => ({
+        ...item,
+        tm: { ...item.tm },
+      }));
+      const item = next[index];
+      if (!item) return source;
+      item.tm = { ...item.tm, [coordinate]: value, infinity: false };
+      return next;
+    });
+  }
+
+  function commitCommandPoint(index, coordinate) {
+    setCommands((current) => {
+      const source = current.length > 0 ? current : commands;
+      const next = source.map((item) => ({
+        ...item,
+        tm: { ...item.tm },
+      }));
+      const item = next[index];
+      if (!item) return source;
+
+      const rawValue = item.tm?.[coordinate];
+      if (rawValue === "") return next;
+      const nextValue = Number(rawValue);
+      if (!Number.isInteger(nextValue)) return next;
+
+      const previousX = integerOrNull(item.tm.x) ?? 0;
+      const previousY = integerOrNull(item.tm.y) ?? 0;
+      const snapped = coordinate === "x"
+        ? snapPointByX(curveForm, nextValue, previousX, previousY)
+        : snapPointByY(curveForm, nextValue, previousX, previousY);
+
+      if (snapped) {
+        const used = new Set(
+          next
+            .filter((_, itemIndex) => itemIndex !== index)
+            .map((command) => `${command.tm?.x}:${command.tm?.y}`)
+        );
+        const point = used.has(`${snapped.x}:${snapped.y}`)
+          ? nearestAvailablePoint(curveForm, snapped.x, used)
+          : snapped;
+        item.tm = { x: point.x, y: point.y, infinity: false };
+      }
+      return next;
+    });
+  }
+
+  function commitCommandPointOnEnter(event, index, coordinate) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitCommandPoint(index, coordinate);
+      event.currentTarget.blur();
+    }
+  }
+
+  function autoFill() {
+    const points = validPointsForCurve(curveForm);
+    if (points.length === 0) return;
+    const used = new Set();
+    const next = commands.map((item) => {
+      const point = nearestAvailablePoint(curveForm, item.m, used);
+      used.add(`${point.x}:${point.y}`);
+      return { ...item, tm: { x: point.x, y: point.y, infinity: false } };
+    });
+    setCommands(next);
+  }
+
   return (
     <section className="panel">
       <h2>Команди управління</h2>
+      <button className="secondary full table-action" onClick={autoFill}>
+        Автоматично підібрати Tm
+      </button>
       <div className="table">
-        <div className="row head"><span>Команда</span><span>m</span><span>Tm</span></div>
-        {commands.map((item) => (
-          <div className="row" key={item.command}>
+        <div className="row command-editor head"><span>Команда</span><span>m</span><span>Tm.x</span><span>Tm.y</span></div>
+        {commands.map((item, index) => (
+          <div className="row command-editor" key={item.command}>
             <span>{item.command}</span>
             <span>{item.m}</span>
-            <span>{pointText(item.tm)}</span>
+            <input
+              type="number"
+              min="0"
+              max={Number(curveForm.p) - 1}
+              step="1"
+              value={item.tm?.x ?? ""}
+              onChange={(event) => updateCommandPoint(index, "x", event.target.value)}
+              onBlur={() => commitCommandPoint(index, "x")}
+              onKeyDown={(event) => commitCommandPointOnEnter(event, index, "x")}
+            />
+            <input
+              type="number"
+              min="0"
+              max={Number(curveForm.p) - 1}
+              step="1"
+              value={item.tm?.y ?? ""}
+              onChange={(event) => updateCommandPoint(index, "y", event.target.value)}
+              onBlur={() => commitCommandPoint(index, "y")}
+              onKeyDown={(event) => commitCommandPointOnEnter(event, index, "y")}
+            />
           </div>
         ))}
       </div>
+      <p className="note">
+        Кожна Tm має бути реальною точкою поточної кривої. Якщо координата не
+        існує, поле перескакує до найближчої допустимої точки.
+      </p>
     </section>
   );
 }
