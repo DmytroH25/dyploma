@@ -36,6 +36,168 @@ function curvePayload(form) {
   };
 }
 
+function integerOrNull(value) {
+  if (value === "") return null;
+  const number = Number(value);
+  return Number.isInteger(number) ? number : null;
+}
+
+function mod(value, p) {
+  return ((value % p) + p) % p;
+}
+
+function validPointsForCurve(form) {
+  const p = integerOrNull(form.p);
+  const a = integerOrNull(form.a);
+  const b = integerOrNull(form.b);
+  if (!p || p < 5 || p > 1009 || a === null || b === null) {
+    return [];
+  }
+
+  const points = [];
+  for (let x = 0; x < p; x += 1) {
+    const rhs = mod(x * x * x + a * x + b, p);
+    for (let y = 0; y < p; y += 1) {
+      if (mod(y * y, p) === rhs) {
+        points.push({ x, y });
+      }
+    }
+  }
+  return points;
+}
+
+function containsPoint(form, point) {
+  const p = integerOrNull(form.p);
+  const a = integerOrNull(form.a);
+  const b = integerOrNull(form.b);
+  if (!p || p < 5 || a === null || b === null || !point) return false;
+  return mod(point.y * point.y, p) === mod(point.x * point.x * point.x + a * point.x + b, p);
+}
+
+function inverseMod(value, p) {
+  let oldR = mod(value, p);
+  let r = p;
+  let oldS = 1;
+  let s = 0;
+
+  while (r !== 0) {
+    const quotient = Math.floor(oldR / r);
+    [oldR, r] = [r, oldR - quotient * r];
+    [oldS, s] = [s, oldS - quotient * s];
+  }
+
+  return oldR === 1 ? mod(oldS, p) : null;
+}
+
+function addPoints(form, first, second) {
+  if (!first) return second;
+  if (!second) return first;
+
+  const p = integerOrNull(form.p);
+  const a = integerOrNull(form.a);
+  if (!p || a === null) return null;
+
+  if (first.x === second.x && mod(first.y + second.y, p) === 0) {
+    return null;
+  }
+
+  let numerator;
+  let denominator;
+  if (first.x === second.x && first.y === second.y) {
+    numerator = 3 * first.x * first.x + a;
+    denominator = 2 * first.y;
+  } else {
+    numerator = second.y - first.y;
+    denominator = second.x - first.x;
+  }
+
+  const inverse = inverseMod(denominator, p);
+  if (inverse === null) return null;
+
+  const lambda = mod(mod(numerator, p) * inverse, p);
+  const x = mod(lambda * lambda - first.x - second.x, p);
+  const y = mod(lambda * (first.x - x) - first.y, p);
+  return { x, y };
+}
+
+function pointOrder(form, point) {
+  const p = integerOrNull(form.p);
+  if (!p || !containsPoint(form, point)) return null;
+
+  let current = null;
+  const max = p + 1 + 2 * Math.floor(Math.sqrt(p)) + 1;
+  for (let n = 1; n <= max; n += 1) {
+    current = addPoints(form, current, point);
+    if (!current) return n;
+  }
+  return null;
+}
+
+function withPointAndOrder(form, point) {
+  const next = { ...form, gx: point.x, gy: point.y };
+  const order = pointOrder(next, point);
+  return { ...next, n: order ?? "" };
+}
+
+function nearestBy(items, target, getter) {
+  return items.reduce((best, item) => {
+    if (!best) return item;
+    return Math.abs(getter(item) - target) < Math.abs(getter(best) - target) ? item : best;
+  }, null);
+}
+
+function snapPointByX(form, nextX, previousX, previousY) {
+  const points = validPointsForCurve(form);
+  if (points.length === 0) return null;
+  const direction = nextX - previousX;
+  const existingX = [...new Set(points.map((point) => point.x))].sort((a, b) => a - b);
+  let snappedX = existingX.includes(nextX) ? nextX : null;
+
+  if (snappedX === null && direction > 0) {
+    snappedX = existingX.find((x) => x > nextX) ?? existingX[existingX.length - 1];
+  }
+  if (snappedX === null && direction < 0) {
+    snappedX = [...existingX].reverse().find((x) => x < nextX) ?? existingX[0];
+  }
+  if (snappedX === null) {
+    snappedX = nearestBy(existingX, nextX, (x) => x);
+  }
+
+  return nearestBy(points.filter((point) => point.x === snappedX), previousY, (point) => point.y);
+}
+
+function snapPointByY(form, nextY, previousX, previousY) {
+  const points = validPointsForCurve(form);
+  if (points.length === 0) return null;
+  const direction = nextY - previousY;
+  const existingY = [...new Set(points.map((point) => point.y))].sort((a, b) => a - b);
+  let snappedY = existingY.includes(nextY) ? nextY : null;
+
+  if (snappedY === null && direction > 0) {
+    snappedY = existingY.find((y) => y > nextY) ?? existingY[existingY.length - 1];
+  }
+  if (snappedY === null && direction < 0) {
+    snappedY = [...existingY].reverse().find((y) => y < nextY) ?? existingY[0];
+  }
+  if (snappedY === null) {
+    snappedY = nearestBy(existingY, nextY, (y) => y);
+  }
+
+  return nearestBy(points.filter((point) => point.y === snappedY), previousX, (point) => point.x);
+}
+
+function snapNearestPoint(form) {
+  const points = validPointsForCurve(form);
+  if (points.length === 0) return null;
+  const gx = integerOrNull(form.gx) ?? 0;
+  const gy = integerOrNull(form.gy) ?? 0;
+  return points.reduce((best, point) => {
+    const score = Math.abs(point.x - gx) + Math.abs(point.y - gy);
+    const bestScore = Math.abs(best.x - gx) + Math.abs(best.y - gy);
+    return score < bestScore ? point : best;
+  }, points[0]);
+}
+
 async function api(path, payload) {
   const response = await fetch(path, {
     method: "POST",
@@ -222,7 +384,53 @@ function App() {
 
 function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
   function update(name, value) {
-    setForm({ ...form, [name]: value });
+    const draft = { ...form, [name]: value };
+    if (["p", "a", "b"].includes(name)) {
+      const currentPoint = { x: integerOrNull(draft.gx), y: integerOrNull(draft.gy) };
+      if (currentPoint.x !== null && currentPoint.y !== null && containsPoint(draft, currentPoint)) {
+        setForm(withPointAndOrder(draft, currentPoint));
+        return;
+      }
+
+      const snapped = snapNearestPoint(draft);
+      if (snapped) {
+        setForm(withPointAndOrder(draft, snapped));
+        return;
+      }
+    }
+    setForm(draft);
+  }
+
+  function updatePointCoordinate(name, value) {
+    if (value === "") {
+      setForm({ ...form, [name]: value });
+      return;
+    }
+
+    const nextValue = Number(value);
+    if (!Number.isInteger(nextValue)) {
+      return;
+    }
+
+    const previousX = integerOrNull(form.gx) ?? 0;
+    const previousY = integerOrNull(form.gy) ?? 0;
+    const draft = { ...form, [name]: value };
+    const snapped = name === "gx"
+      ? snapPointByX(draft, nextValue, previousX, previousY)
+      : snapPointByY(draft, nextValue, previousX, previousY);
+
+    if (snapped) {
+      setForm(withPointAndOrder(draft, snapped));
+    } else {
+      setForm(draft);
+    }
+  }
+
+  function snapCurrentPoint() {
+    const snapped = snapNearestPoint(form);
+    if (snapped) {
+      setForm(withPointAndOrder(form, snapped));
+    }
   }
 
   return (
@@ -232,10 +440,13 @@ function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
         <label>p<input type="number" value={form.p} onChange={(e) => update("p", e.target.value)} /></label>
         <label>a<input type="number" value={form.a} onChange={(e) => update("a", e.target.value)} /></label>
         <label>b<input type="number" value={form.b} onChange={(e) => update("b", e.target.value)} /></label>
-        <label>G.x<input type="number" value={form.gx} onChange={(e) => update("gx", e.target.value)} /></label>
-        <label>G.y<input type="number" value={form.gy} onChange={(e) => update("gy", e.target.value)} /></label>
+        <label>G.x<input type="number" min="0" max={Number(form.p) - 1} step="1" value={form.gx} onChange={(e) => updatePointCoordinate("gx", e.target.value)} /></label>
+        <label>G.y<input type="number" min="0" max={Number(form.p) - 1} step="1" value={form.gy} onChange={(e) => updatePointCoordinate("gy", e.target.value)} /></label>
         <label>n<input type="number" value={form.n} onChange={(e) => update("n", e.target.value)} /></label>
       </div>
+      <button className="secondary full" onClick={snapCurrentPoint}>
+        Підібрати найближчу G
+      </button>
       <button className="primary full" onClick={onValidate} disabled={loading}>
         {loading ? "Перевірка..." : "Перевірити криву"}
       </button>
