@@ -10,8 +10,7 @@ const defaultCurveForm = {
 };
 
 const emptyEncryption = {
-  command: "MOVE_FORWARD",
-  parameter: 10,
+  command: "MOVE_FORWARD_1M",
 };
 
 const emptyDecryption = {
@@ -198,9 +197,9 @@ function snapNearestPoint(form) {
   }, points[0]);
 }
 
-function nearestAvailablePoint(form, targetX, used) {
+function nearestAvailablePoint(form, targetX, usedX) {
   const points = validPointsForCurve(form);
-  const available = points.filter((point) => !used.has(`${point.x}:${point.y}`));
+  const available = points.filter((point) => point.x !== 0 && !usedX.has(point.x));
   if (available.length === 0) return points[0];
   return available.reduce((best, point) => {
     const score = Math.abs(point.x - targetX);
@@ -214,14 +213,14 @@ function normalizeCommandTable(form, commands) {
   const points = validPointsForCurve(form);
   if (points.length === 0 || commands.length === 0) return commands;
 
-  const used = new Set();
+  const usedX = new Set();
   return commands.map((item) => {
     const current = item.tm ? { x: Number(item.tm.x), y: Number(item.tm.y) } : null;
-    let point = current && containsPoint(form, current) && !used.has(`${current.x}:${current.y}`)
+    let point = current && current.x !== 0 && containsPoint(form, current) && !usedX.has(current.x)
       ? current
-      : nearestAvailablePoint(form, current?.x ?? item.m, used);
-    used.add(`${point.x}:${point.y}`);
-    return { ...item, tm: { x: point.x, y: point.y, infinity: false } };
+      : nearestAvailablePoint(form, current?.x ?? item.m, usedX);
+    usedX.add(point.x);
+    return { ...item, m: point.x, tm: { x: point.x, y: point.y, infinity: false } };
   });
 }
 
@@ -309,7 +308,6 @@ function App() {
         curve: activeCurve,
         commandPoints: activeCommands,
         command: encryptForm.command,
-        parameter: encryptForm.parameter === "" ? null : Number(encryptForm.parameter),
       });
       setEncryptResult(result);
       setDecryptForm({
@@ -565,14 +563,15 @@ function CommandTable({ commands, curveForm, setCommands }) {
         : snapPointByY(curveForm, nextValue, previousX, previousY);
 
       if (snapped) {
-        const used = new Set(
+        const usedX = new Set(
           next
             .filter((_, itemIndex) => itemIndex !== index)
-            .map((command) => `${command.tm?.x}:${command.tm?.y}`)
+            .map((command) => Number(command.tm?.x))
         );
-        const point = used.has(`${snapped.x}:${snapped.y}`)
-          ? nearestAvailablePoint(curveForm, snapped.x, used)
+        const point = snapped.x === 0 || usedX.has(snapped.x)
+          ? nearestAvailablePoint(curveForm, snapped.x, usedX)
           : snapped;
+        item.m = point.x;
         item.tm = { x: point.x, y: point.y, infinity: false };
       }
       return next;
@@ -590,11 +589,11 @@ function CommandTable({ commands, curveForm, setCommands }) {
   function autoFill() {
     const points = validPointsForCurve(curveForm);
     if (points.length === 0) return;
-    const used = new Set();
+    const usedX = new Set();
     const next = commands.map((item) => {
-      const point = nearestAvailablePoint(curveForm, item.m, used);
-      used.add(`${point.x}:${point.y}`);
-      return { ...item, tm: { x: point.x, y: point.y, infinity: false } };
+      const point = nearestAvailablePoint(curveForm, item.m, usedX);
+      usedX.add(point.x);
+      return { ...item, m: point.x, tm: { x: point.x, y: point.y, infinity: false } };
     });
     setCommands(next);
   }
@@ -646,7 +645,7 @@ function EncryptionForm({ commands, form, setForm, onSubmit, loading, result }) 
   return (
     <section className="panel large">
       <h2>Шифрування команди</h2>
-      <div className="form-grid">
+      <div className="form-grid single">
         <label>
           Команда
           <select
@@ -657,15 +656,6 @@ function EncryptionForm({ commands, form, setForm, onSubmit, loading, result }) 
               <option key={item.command} value={item.command}>{item.command}</option>
             ))}
           </select>
-        </label>
-        <label>
-          Параметр команди
-          <input
-            type="number"
-            value={form.parameter}
-            onChange={(event) => setForm({ ...form, parameter: event.target.value })}
-            placeholder="Наприклад, 10"
-          />
         </label>
       </div>
       <button className="primary" onClick={onSubmit} disabled={loading || commands.length === 0}>
@@ -678,7 +668,6 @@ function EncryptionForm({ commands, form, setForm, onSubmit, loading, result }) 
           rows={[
             ["Команда", result.command],
             ["Числове значення m", result.m],
-            ["Параметр", result.parameter ?? "-"],
             ["Точка команди Tm", pointText(result.Tm)],
             ["Випадковий скаляр k", result.k],
             ["Маскувальна точка Tk", pointText(result.Tk)],

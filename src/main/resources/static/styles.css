@@ -251,6 +251,10 @@ button:disabled {
   gap: 14px;
 }
 
+.form-grid.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .curve-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

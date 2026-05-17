@@ -5,7 +5,6 @@ import java.math.BigInteger;
 
 public record EncryptResponse(
     String command,
-    BigInteger parameter,
     int m,
     @JsonProperty("Tm") PointDto tm,
     BigInteger k,

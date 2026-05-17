@@ -31,13 +31,21 @@ public class EccDemoService {
 
   private static final List<CommandName> COMMANDS = List.of(
       new CommandName("STOP", 1),
-      new CommandName("MOVE_FORWARD", 2),
-      new CommandName("MOVE_BACKWARD", 3),
-      new CommandName("TURN_LEFT", 4),
-      new CommandName("TURN_RIGHT", 5),
-      new CommandName("INCREASE_SPEED", 6),
-      new CommandName("DECREASE_SPEED", 7),
-      new CommandName("SET_ALTITUDE", 8)
+      new CommandName("MOVE_FORWARD_1M", 2),
+      new CommandName("MOVE_BACKWARD_1M", 3),
+      new CommandName("TURN_LEFT_5_DEG", 4),
+      new CommandName("TURN_RIGHT_5_DEG", 5),
+      new CommandName("TURN_LEFT_15_DEG", 6),
+      new CommandName("TURN_RIGHT_15_DEG", 7),
+      new CommandName("INCREASE_SPEED_10", 8),
+      new CommandName("DECREASE_SPEED_10", 9),
+      new CommandName("SET_SPEED_20", 10),
+      new CommandName("SET_ALTITUDE_50M", 11),
+      new CommandName("SET_ALTITUDE_100M", 12),
+      new CommandName("TAKE_OFF", 13),
+      new CommandName("LAND", 14),
+      new CommandName("RETURN_HOME", 15),
+      new CommandName("STATUS_REQUEST", 16)
   );
 
   public CurveInfoResponse defaultCurveInfo() {
@@ -52,8 +60,7 @@ public class EccDemoService {
   public EncryptResponse encrypt(
       CurveRequest request,
       List<CommandInfo> commandPoints,
-      String command,
-      BigInteger parameter
+      String command
   ) {
     CurveContext context = buildContext(request, commandPoints);
     CommandMapping mapping = findCommand(context, command);
@@ -70,7 +77,6 @@ public class EccDemoService {
 
     return new EncryptResponse(
         mapping.command(),
-        parameter,
         mapping.m(),
         PointDto.from(mapping.tm()),
         k,
@@ -181,12 +187,12 @@ public class EccDemoService {
 
   private Map<String, CommandMapping> buildCommandTable(EllipticCurve curve) {
     Map<String, CommandMapping> mappings = new LinkedHashMap<>();
-    Set<EcPoint> used = new LinkedHashSet<>();
+    Set<BigInteger> usedX = new LinkedHashSet<>();
     for (CommandName command : COMMANDS) {
-      EcPoint tm = findNearestPoint(curve, command.m(), used);
-      CommandMapping mapping = new CommandMapping(command.command(), command.m(), tm);
+      EcPoint tm = findNearestPoint(curve, command.preferredX(), usedX);
+      CommandMapping mapping = new CommandMapping(command.command(), messageFromPoint(tm), tm);
       mappings.put(command.command(), mapping);
-      used.add(tm);
+      usedX.add(tm.x());
     }
     return mappings;
   }
@@ -201,6 +207,7 @@ public class EccDemoService {
 
     Map<String, CommandMapping> mappings = new LinkedHashMap<>();
     Set<EcPoint> used = new LinkedHashSet<>();
+    Set<BigInteger> usedX = new LinkedHashSet<>();
     for (CommandName command : COMMANDS) {
       CommandInfo item = byName.get(command.command());
       if (item == null || item.tm() == null || item.tm().x() == null || item.tm().y() == null) {
@@ -214,15 +221,22 @@ public class EccDemoService {
       if (used.contains(tm)) {
         throw new IllegalArgumentException("Кілька команд не можуть мати однакову точку Tm");
       }
+      if (tm.x().signum() == 0) {
+        throw new IllegalArgumentException("Повідомлення m = Tm.x не може дорівнювати 0");
+      }
+      if (usedX.contains(tm.x())) {
+        throw new IllegalArgumentException("Кілька команд не можуть мати однакове повідомлення m = Tm.x");
+      }
 
-      CommandMapping mapping = new CommandMapping(command.command(), command.m(), tm);
+      CommandMapping mapping = new CommandMapping(command.command(), messageFromPoint(tm), tm);
       mappings.put(command.command(), mapping);
       used.add(tm);
+      usedX.add(tm.x());
     }
     return mappings;
   }
 
-  private EcPoint findNearestPoint(EllipticCurve curve, int targetX, Set<EcPoint> used) {
+  private EcPoint findNearestPoint(EllipticCurve curve, int targetX, Set<BigInteger> usedX) {
     int p = curve.p().intValueExact();
     for (int distance = 0; distance < p; distance++) {
       List<Integer> candidates = new ArrayList<>();
@@ -238,13 +252,13 @@ public class EccDemoService {
       for (Integer x : candidates) {
         for (int y = 0; y < p; y++) {
           EcPoint point = EcPoint.of(x, y);
-          if (curve.contains(point) && !used.contains(point)) {
+          if (curve.contains(point) && point.x().signum() > 0 && !usedX.contains(point.x())) {
             return point;
           }
         }
       }
     }
-    throw new IllegalArgumentException("На кривій недостатньо точок для таблиці команд");
+    throw new IllegalArgumentException("На кривій недостатньо різних x-координат для таблиці команд");
   }
 
   private CommandMapping findCommand(CurveContext context, String command) {
@@ -310,7 +324,11 @@ public class EccDemoService {
     );
   }
 
-  private record CommandName(String command, int m) {
+  private int messageFromPoint(EcPoint point) {
+    return point.x().intValueExact();
+  }
+
+  private record CommandName(String command, int preferredX) {
   }
 
   private record CommandMapping(String command, int m, EcPoint tm) {
