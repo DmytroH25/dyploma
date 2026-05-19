@@ -910,10 +910,10 @@ function CurveVisualizer({ curveForm, result, mode }) {
 
         <aside className="visualizer-side">
           <dl className="visualizer-fields">
-            <div><dt>Curve</dt><dd>a = {curveForm.a}, b = {curveForm.b}</dd></div>
-            <div><dt>Field</dt><dd>p = {curveForm.p}</dd></div>
-            <div><dt>Stage</dt><dd>{stage.title}</dd></div>
-            <div><dt>Formula</dt><dd>{stage.formula}</dd></div>
+            <div><dt>Крива</dt><dd>a = {curveForm.a}, b = {curveForm.b}</dd></div>
+            <div><dt>Поле</dt><dd>p = {curveForm.p}</dd></div>
+            <div><dt>Крок</dt><dd>{stage.title}</dd></div>
+            <div><dt>Формула</dt><dd>{stage.formula}</dd></div>
           </dl>
 
           <div className="point-list">
