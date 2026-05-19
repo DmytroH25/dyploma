@@ -30,22 +30,22 @@ public class EccDemoService {
   private static final int MAX_DEMO_P = 1009;
 
   private static final List<CommandName> COMMANDS = List.of(
-      new CommandName("STOP", 1),
-      new CommandName("MOVE_FORWARD_1M", 2),
-      new CommandName("MOVE_BACKWARD_1M", 3),
-      new CommandName("TURN_LEFT_5_DEG", 4),
-      new CommandName("TURN_RIGHT_5_DEG", 5),
-      new CommandName("TURN_LEFT_15_DEG", 6),
-      new CommandName("TURN_RIGHT_15_DEG", 7),
-      new CommandName("INCREASE_SPEED_10", 8),
-      new CommandName("DECREASE_SPEED_10", 9),
-      new CommandName("SET_SPEED_20", 10),
-      new CommandName("SET_ALTITUDE_50M", 11),
-      new CommandName("SET_ALTITUDE_100M", 12),
-      new CommandName("TAKE_OFF", 13),
-      new CommandName("LAND", 14),
-      new CommandName("RETURN_HOME", 15),
-      new CommandName("STATUS_REQUEST", 16)
+      new CommandName("MOVE_FORWARD_5M", 1),
+      new CommandName("MOVE_BACKWARD_5M", 2),
+      new CommandName("TURN_LEFT_5DEG", 3),
+      new CommandName("TURN_RIGHT_5DEG", 4),
+      new CommandName("TURN_LEFT_15DEG", 5),
+      new CommandName("TURN_RIGHT_15DEG", 6),
+      new CommandName("ASCEND_10M", 7),
+      new CommandName("DESCEND_10M", 8),
+      new CommandName("INCREASE_SPEED_5", 9),
+      new CommandName("DECREASE_SPEED_5", 10),
+      new CommandName("CAMERA_LEFT_15DEG", 11),
+      new CommandName("CAMERA_RIGHT_15DEG", 12),
+      new CommandName("CAMERA_UP_10DEG", 13),
+      new CommandName("CAMERA_DOWN_10DEG", 14),
+      new CommandName("ROTATE_180DEG", 15),
+      new CommandName("STOP", 16)
   );
 
   public CurveInfoResponse defaultCurveInfo() {

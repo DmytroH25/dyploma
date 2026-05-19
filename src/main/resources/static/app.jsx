@@ -10,7 +10,7 @@ const defaultCurveForm = {
 };
 
 const emptyEncryption = {
-  command: "MOVE_FORWARD_1M",
+  command: "MOVE_FORWARD_5M",
 };
 
 const emptyDecryption = {
