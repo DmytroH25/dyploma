@@ -339,6 +339,189 @@ select:focus {
   background: #f8faf8;
 }
 
+.visualizer {
+  margin-top: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.visualizer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  background: #f0f1ef;
+  border-bottom: 1px solid var(--line);
+}
+
+.visualizer-head h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.visualizer-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.visualizer-tabs button {
+  width: 38px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.visualizer-tabs button.active {
+  border-color: var(--accent);
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.visualizer-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.05fr) minmax(280px, 0.95fr);
+  gap: 24px;
+  padding: 22px;
+  align-items: start;
+}
+
+.curve-canvas {
+  width: 100%;
+  max-height: 620px;
+  border: 2px solid #5b5f5c;
+  background: #fbfcfb;
+}
+
+.curve-canvas rect {
+  fill: transparent;
+  stroke: #585d5a;
+  stroke-width: 1.5;
+}
+
+.curve-canvas line {
+  stroke: rgba(96, 105, 101, 0.22);
+  stroke-width: 1;
+}
+
+.curve-point {
+  fill: #ffffff;
+  stroke: #a8d4f5;
+  stroke-width: 2.2;
+}
+
+.operation-line {
+  stroke: #efb51d !important;
+  stroke-width: 2.5 !important;
+}
+
+.highlight-point circle {
+  opacity: 0.82;
+  stroke-width: 2;
+}
+
+.highlight-point text {
+  fill: #1b1b1b;
+  font: 700 13px Inter, "Segoe UI", sans-serif;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.highlight-point.message circle,
+.point-pill.message {
+  fill: #f4cb54;
+  background: #fff6d7;
+  border-color: #efc84f;
+}
+
+.highlight-point.mask circle,
+.point-pill.mask {
+  fill: #7fc6eb;
+  background: #e8f6fd;
+  border-color: #93cdec;
+}
+
+.highlight-point.result circle,
+.point-pill.result {
+  fill: #df6b6b;
+  background: #fff0f0;
+  border-color: #e46f6f;
+}
+
+.highlight-point.inverse circle,
+.point-pill.inverse {
+  fill: #9fd27c;
+  background: #eff9e9;
+  border-color: #9dca7c;
+}
+
+.visualizer-side {
+  padding-top: 18px;
+}
+
+.visualizer-fields {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.visualizer-fields div {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.visualizer-fields dt {
+  color: #111;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.visualizer-fields dd {
+  border: 1px solid #9db8d0;
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: #f9fcff;
+  font-size: 15px;
+}
+
+.point-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.point-pill {
+  display: grid;
+  gap: 3px;
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.point-pill strong {
+  font-size: 14px;
+}
+
+.point-pill span {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 14px;
+}
+
+.visualizer-side p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   main {
     width: min(100% - 24px, 720px);
@@ -351,6 +534,15 @@ select:focus {
 
   .formula-panel {
     max-width: 420px;
+  }
+
+  .visualizer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .visualizer-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

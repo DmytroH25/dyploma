@@ -355,7 +355,6 @@ function App() {
     <main>
       <section className="hero">
         <div>
-          <p className="eyebrow">Дипломний демонстратор</p>
           <h1>ECC-шифрування команд управління</h1>
           <p>
             Користувач може змінювати параметри кривої над полем Fp, перевіряти
@@ -417,6 +416,13 @@ function App() {
               loading={loading}
               result={decryptResult}
             />
+          )}
+
+          {mode === "encrypt" && encryptResult && (
+            <CurveVisualizer curveForm={curveForm} result={encryptResult} mode="encrypt" />
+          )}
+          {mode === "decrypt" && decryptResult && (
+            <CurveVisualizer curveForm={curveForm} result={decryptResult} mode="decrypt" />
           )}
         </section>
       </section>
@@ -732,6 +738,165 @@ function DecryptionForm({ form, setForm, onSubmit, loading, result }) {
           ]}
         />
       )}
+    </section>
+  );
+}
+
+function CurveVisualizer({ curveForm, result, mode }) {
+  const [stageIndex, setStageIndex] = useState(0);
+  const points = useMemo(() => validPointsForCurve(curveForm), [curveForm]);
+  const p = integerOrNull(curveForm.p) || 1;
+  const size = 520;
+  const pad = 34;
+  const plotSize = size - pad * 2;
+  const max = Math.max(1, p - 1);
+
+  useEffect(() => {
+    setStageIndex(0);
+  }, [result, mode]);
+
+  function sx(x) {
+    return pad + (Number(x) / max) * plotSize;
+  }
+
+  function sy(y) {
+    return pad + plotSize - (Number(y) / max) * plotSize;
+  }
+
+  function pointFromDto(point) {
+    if (!point || point.infinity) return null;
+    return { x: Number(point.x), y: Number(point.y) };
+  }
+
+  const stages = mode === "encrypt"
+    ? [
+        {
+          title: "1. Повідомлення у точці Tm",
+          formula: "m = x(Tm)",
+          points: [{ label: "Tm", point: pointFromDto(result.Tm), role: "message" }],
+        },
+        {
+          title: "2. Маскувальна точка Tk",
+          formula: `Tk = kG, k = ${result.k}`,
+          points: [{ label: "Tk", point: pointFromDto(result.Tk), role: "mask" }],
+        },
+        {
+          title: "3. Криптограма Tx",
+          formula: "Tx = Tm + Tk",
+          points: [
+            { label: "Tm", point: pointFromDto(result.Tm), role: "message" },
+            { label: "Tk", point: pointFromDto(result.Tk), role: "mask" },
+            { label: "Tx", point: pointFromDto(result.Tx), role: "result" },
+          ],
+          line: [pointFromDto(result.Tm), pointFromDto(result.Tk)],
+        },
+      ]
+    : [
+        {
+          title: "1. Отримана криптограма",
+          formula: "Tx = (x, y)",
+          points: [{ label: "Tx", point: pointFromDto(result.Tx), role: "result" }],
+        },
+        {
+          title: "2. Повторне обчислення маски",
+          formula: `Tk = kG, k = ${result.k}`,
+          points: [{ label: "Tk", point: pointFromDto(result.Tk), role: "mask" }],
+        },
+        {
+          title: "3. Обернена точка",
+          formula: "-Tk = (x, -y mod p)",
+          points: [
+            { label: "Tk", point: pointFromDto(result.Tk), role: "mask" },
+            { label: "-Tk", point: pointFromDto(result.negativeTk), role: "inverse" },
+          ],
+        },
+        {
+          title: "4. Відновлення Tm",
+          formula: "Tm = Tx + (-Tk)",
+          points: [
+            { label: "Tx", point: pointFromDto(result.Tx), role: "result" },
+            { label: "-Tk", point: pointFromDto(result.negativeTk), role: "inverse" },
+            { label: "Tm", point: pointFromDto(result.Tm), role: "message" },
+          ],
+          line: [pointFromDto(result.Tx), pointFromDto(result.negativeTk)],
+        },
+      ];
+
+  const stage = stages[stageIndex];
+  const visiblePoints = stage.points.filter((item) => item.point);
+
+  return (
+    <section className="visualizer">
+      <header className="visualizer-head">
+        <h2>Покрокові операції на еліптичній кривій (F<sub>p</sub>)</h2>
+        <div className="visualizer-tabs">
+          {stages.map((item, index) => (
+            <button
+              key={item.title}
+              className={index === stageIndex ? "active" : ""}
+              onClick={() => setStageIndex(index)}
+            >
+              {index + 1}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <div className="visualizer-grid">
+        <svg className="curve-canvas" viewBox={`0 0 ${size} ${size}`} role="img">
+          <rect x={pad} y={pad} width={plotSize} height={plotSize} />
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <g key={ratio}>
+              <line x1={pad + ratio * plotSize} y1={pad} x2={pad + ratio * plotSize} y2={pad + plotSize} />
+              <line x1={pad} y1={pad + ratio * plotSize} x2={pad + plotSize} y2={pad + ratio * plotSize} />
+            </g>
+          ))}
+
+          {points.map((point) => (
+            <circle key={`${point.x}:${point.y}`} className="curve-point" cx={sx(point.x)} cy={sy(point.y)} r="3.2" />
+          ))}
+
+          {stage.line?.[0] && stage.line?.[1] && (
+            <line
+              className="operation-line"
+              x1={sx(stage.line[0].x)}
+              y1={sy(stage.line[0].y)}
+              x2={sx(stage.line[1].x)}
+              y2={sy(stage.line[1].y)}
+            />
+          )}
+
+          {visiblePoints.map((item) => (
+            <g key={item.label} className={`highlight-point ${item.role}`}>
+              <circle cx={sx(item.point.x)} cy={sy(item.point.y)} r="16" />
+              <text x={sx(item.point.x)} y={sy(item.point.y) + 5}>{item.label}</text>
+            </g>
+          ))}
+        </svg>
+
+        <aside className="visualizer-side">
+          <dl className="visualizer-fields">
+            <div><dt>Curve</dt><dd>a = {curveForm.a}, b = {curveForm.b}</dd></div>
+            <div><dt>Field</dt><dd>p = {curveForm.p}</dd></div>
+            <div><dt>Stage</dt><dd>{stage.title}</dd></div>
+            <div><dt>Formula</dt><dd>{stage.formula}</dd></div>
+          </dl>
+
+          <div className="point-list">
+            {visiblePoints.map((item) => (
+              <div className={`point-pill ${item.role}`} key={item.label}>
+                <strong>{item.label}</strong>
+                <span>{pointText(item.point)}</span>
+              </div>
+            ))}
+          </div>
+
+          <p>
+            Точки кривої показані блакитними маркерами. Поточний етап
+            підсвічує саме ті точки, які беруть участь у відповідній формулі.
+          </p>
+        </aside>
+      </div>
     </section>
   );
 }
