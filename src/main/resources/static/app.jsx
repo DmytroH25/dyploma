@@ -138,6 +138,24 @@ function withPointAndOrder(form, point) {
   return { ...next, n: order ?? "" };
 }
 
+function niceAxisTicks(max, targetCount = 6) {
+  if (max <= 0) return [0];
+  const rawStep = max / targetCount;
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const normalized = rawStep / magnitude;
+  const niceMultiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const step = niceMultiplier * magnitude;
+  const ticks = [];
+
+  for (let tick = 0; tick <= max; tick += step) {
+    ticks.push(tick);
+  }
+  if (ticks[ticks.length - 1] !== max) {
+    ticks.push(max);
+  }
+  return ticks;
+}
+
 function nearestBy(items, target, getter) {
   return items.reduce((best, item) => {
     if (!best) return item;
@@ -768,6 +786,8 @@ function CurveVisualizer({ curveForm, result, mode }) {
     return { x: Number(point.x), y: Number(point.y) };
   }
 
+  const axisTicks = niceAxisTicks(max);
+
   const stages = mode === "encrypt"
     ? [
         {
@@ -849,6 +869,20 @@ function CurveVisualizer({ curveForm, result, mode }) {
             <g key={ratio}>
               <line x1={pad + ratio * plotSize} y1={pad} x2={pad + ratio * plotSize} y2={pad + plotSize} />
               <line x1={pad} y1={pad + ratio * plotSize} x2={pad + plotSize} y2={pad + ratio * plotSize} />
+            </g>
+          ))}
+
+          {axisTicks.map((tick) => (
+            <g className="axis-tick" key={`x-${tick}`}>
+              <line x1={sx(tick)} y1={pad + plotSize} x2={sx(tick)} y2={pad + plotSize + 6} />
+              <text x={sx(tick)} y={pad + plotSize + 23}>{tick}</text>
+            </g>
+          ))}
+
+          {axisTicks.map((tick) => (
+            <g className="axis-tick" key={`y-${tick}`}>
+              <line x1={pad - 6} y1={sy(tick)} x2={pad} y2={sy(tick)} />
+              <text x={pad - 12} y={sy(tick) + 5}>{tick}</text>
             </g>
           ))}
 

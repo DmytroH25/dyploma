@@ -408,6 +408,26 @@ select:focus {
   stroke-width: 1;
 }
 
+.axis-tick line {
+  stroke: #5f6662;
+  stroke-width: 1.4;
+}
+
+.axis-tick text,
+.axis-label {
+  fill: #4c5550;
+  font: 700 13px Inter, "Segoe UI", sans-serif;
+  text-anchor: middle;
+}
+
+.axis-tick text:first-of-type {
+  text-anchor: end;
+}
+
+.axis-label {
+  font-size: 15px;
+}
+
 .curve-point {
   fill: #ffffff;
   stroke: #a8d4f5;
