@@ -10,7 +10,7 @@ const defaultCurveForm = {
 };
 
 const emptyEncryption = {
-  command: "MOVE_FORWARD_5M",
+  command: "MOVE_FORWARD",
 };
 
 const emptyDecryption = {
@@ -149,9 +149,6 @@ function niceAxisTicks(max, targetCount = 6) {
 
   for (let tick = 0; tick <= max; tick += step) {
     ticks.push(tick);
-  }
-  if (ticks[ticks.length - 1] !== max) {
-    ticks.push(max);
   }
   return ticks;
 }

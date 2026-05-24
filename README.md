@@ -38,8 +38,8 @@ n = 81
 У застосунку використовується 16 команд:
 
 ```text
-MOVE_FORWARD_5M
-MOVE_BACKWARD_5M
+MOVE_FORWARD
+MOVE_BACKWARD
 TURN_LEFT_5DEG
 TURN_RIGHT_5DEG
 TURN_LEFT_15DEG
@@ -83,7 +83,7 @@ Content-Type: application/json
     },
     "n": 81
   },
-  "command": "MOVE_FORWARD_5M"
+  "command": "MOVE_FORWARD"
 }
 ```
 

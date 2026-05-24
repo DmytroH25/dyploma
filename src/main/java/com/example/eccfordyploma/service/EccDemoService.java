@@ -30,8 +30,8 @@ public class EccDemoService {
   private static final int MAX_DEMO_P = 1009;
 
   private static final List<CommandName> COMMANDS = List.of(
-      new CommandName("MOVE_FORWARD_5M", 1),
-      new CommandName("MOVE_BACKWARD_5M", 2),
+      new CommandName("MOVE_FORWARD", 1),
+      new CommandName("MOVE_BACKWARD", 2),
       new CommandName("TURN_LEFT_5DEG", 3),
       new CommandName("TURN_RIGHT_5DEG", 4),
       new CommandName("TURN_LEFT_15DEG", 5),
