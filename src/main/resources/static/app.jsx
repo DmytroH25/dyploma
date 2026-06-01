@@ -346,7 +346,7 @@ function App() {
       const txY = Number(decryptForm.txY);
       const k = Number(decryptForm.k);
       if (!Number.isInteger(txX) || !Number.isInteger(txY)) {
-        throw new Error("Координати Tx мають бути цілими числами");
+        throw new Error("Координати Tₓ мають бути цілими числами");
       }
       if (!Number.isInteger(k) || k <= 0) {
         throw new Error("Скаляр k має бути цілим числом більшим за 0");
@@ -372,16 +372,16 @@ function App() {
         <div>
           <h1>ECC-шифрування команд управління</h1>
           <p>
-            Користувач може змінювати параметри кривої над полем Fp, перевіряти
+            Користувач може змінювати параметри кривої над полем Fₚ, перевіряти
             базову точку G, автоматично будувати таблицю команд і проходити
             шифрування або дешифрування за формулами еліптичних кривих.
           </p>
         </div>
         <div className="formula-panel">
           <span>Шифрування</span>
-          <strong>Tx = Tm + kG</strong>
+          <strong>Tₓ = Tₘ + Tₖ</strong>
           <span>Дешифрування</span>
-          <strong>Tm = Tx + (-kG)</strong>
+          <strong>Tₘ = Tₓ + (-Tₖ)</strong>
         </div>
       </section>
 
@@ -541,7 +541,7 @@ function CurvePanel({ curve, form, setForm, error, onValidate, loading }) {
       )}
       <p className="note">
         Таблиця команд нижче будується автоматично: для кожного m шукається
-        допустима найближча точка Tm на поточній кривій.
+        допустима найближча точка Tₘ на поточній кривій.
       </p>
     </section>
   );
@@ -623,10 +623,10 @@ function CommandTable({ commands, curveForm, setCommands }) {
     <section className="panel">
       <h2>Команди управління</h2>
       <button className="secondary full table-action" onClick={autoFill}>
-        Автоматично підібрати Tm
+        Автоматично підібрати Tₘ
       </button>
       <div className="table">
-        <div className="row command-editor head"><span>Команда</span><span>m</span><span>Tm.x</span><span>Tm.y</span></div>
+        <div className="row command-editor head"><span>Команда</span><span>m</span><span>Tₘ.x</span><span>Tₘ.y</span></div>
         {commands.map((item, index) => (
           <div className="row command-editor" key={item.command}>
             <span>{item.command}</span>
@@ -655,7 +655,7 @@ function CommandTable({ commands, curveForm, setCommands }) {
         ))}
       </div>
       <p className="note">
-        Кожна Tm має бути реальною точкою поточної кривої. Якщо координата не
+        Кожна Tₘ має бути реальною точкою поточної кривої. Якщо координата не
         існує, поле перескакує до найближчої допустимої точки.
       </p>
     </section>
@@ -689,10 +689,10 @@ function EncryptionForm({ commands, form, setForm, onSubmit, loading, result }) 
           rows={[
             ["Команда", result.command],
             ["Числове значення m", result.m],
-            ["Точка команди Tm", pointText(result.Tm)],
+            ["Точка команди Tₘ", pointText(result.Tm)],
             ["Випадковий скаляр k", result.k],
-            ["Маскувальна точка Tk", pointText(result.Tk)],
-            ["Криптограма Tx", pointText(result.Tx)],
+            ["Маскувальна точка Tₖ", pointText(result.Tk)],
+            ["Криптограма Tₓ", pointText(result.Tx)],
             ["Формула", result.formula],
           ]}
         />
@@ -707,7 +707,7 @@ function DecryptionForm({ form, setForm, onSubmit, loading, result }) {
       <h2>Дешифрування криптограми</h2>
       <div className="form-grid three">
         <label>
-          Tx.x
+          Tₓ.x
           <input
             type="number"
             value={form.txX}
@@ -716,7 +716,7 @@ function DecryptionForm({ form, setForm, onSubmit, loading, result }) {
           />
         </label>
         <label>
-          Tx.y
+          Tₓ.y
           <input
             type="number"
             value={form.txY}
@@ -742,11 +742,11 @@ function DecryptionForm({ form, setForm, onSubmit, loading, result }) {
         <ResultBlock
           title="Результат дешифрування"
           rows={[
-            ["Отримана криптограма Tx", pointText(result.Tx)],
+            ["Отримана криптограма Tₓ", pointText(result.Tx)],
             ["Скаляр k", result.k],
-            ["Маскувальна точка Tk", pointText(result.Tk)],
-            ["Обернена точка -Tk", pointText(result.negativeTk)],
-            ["Відновлена точка Tm", pointText(result.Tm)],
+            ["Маскувальна точка Tₖ", pointText(result.Tk)],
+            ["Обернена точка -Tₖ", pointText(result.negativeTk)],
+            ["Відновлена точка Tₘ", pointText(result.Tm)],
             ["Відновлене m", result.m],
             ["Відновлена команда", result.command],
             ["Формула", result.formula],
@@ -788,22 +788,22 @@ function CurveVisualizer({ curveForm, result, mode }) {
   const stages = mode === "encrypt"
     ? [
         {
-          title: "1. Повідомлення у точці Tm",
-          formula: "m = x(Tm)",
-          points: [{ label: "Tm", point: pointFromDto(result.Tm), role: "message" }],
+          title: "1. Повідомлення у точці Tₘ",
+          formula: "m = x(Tₘ)",
+          points: [{ label: "Tₘ", point: pointFromDto(result.Tm), role: "message" }],
         },
         {
-          title: "2. Маскувальна точка Tk",
-          formula: `Tk = kG, k = ${result.k}`,
-          points: [{ label: "Tk", point: pointFromDto(result.Tk), role: "mask" }],
+          title: "2. Маскувальна точка Tₖ",
+          formula: `Tₖ = kG, k = ${result.k}`,
+          points: [{ label: "Tₖ", point: pointFromDto(result.Tk), role: "mask" }],
         },
         {
-          title: "3. Криптограма Tx",
-          formula: "Tx = Tm + Tk",
+          title: "3. Криптограма Tₓ",
+          formula: "Tₓ = Tₘ + Tₖ",
           points: [
-            { label: "Tm", point: pointFromDto(result.Tm), role: "message" },
-            { label: "Tk", point: pointFromDto(result.Tk), role: "mask" },
-            { label: "Tx", point: pointFromDto(result.Tx), role: "result" },
+            { label: "Tₘ", point: pointFromDto(result.Tm), role: "message" },
+            { label: "Tₖ", point: pointFromDto(result.Tk), role: "mask" },
+            { label: "Tₓ", point: pointFromDto(result.Tx), role: "result" },
           ],
           line: [pointFromDto(result.Tm), pointFromDto(result.Tk)],
         },
@@ -811,29 +811,29 @@ function CurveVisualizer({ curveForm, result, mode }) {
     : [
         {
           title: "1. Отримана криптограма",
-          formula: "Tx = (x, y)",
-          points: [{ label: "Tx", point: pointFromDto(result.Tx), role: "result" }],
+          formula: "Tₓ = (x, y)",
+          points: [{ label: "Tₓ", point: pointFromDto(result.Tx), role: "result" }],
         },
         {
           title: "2. Повторне обчислення маски",
-          formula: `Tk = kG, k = ${result.k}`,
-          points: [{ label: "Tk", point: pointFromDto(result.Tk), role: "mask" }],
+          formula: `Tₖ = kG, k = ${result.k}`,
+          points: [{ label: "Tₖ", point: pointFromDto(result.Tk), role: "mask" }],
         },
         {
           title: "3. Обернена точка",
-          formula: "-Tk = (x, -y mod p)",
+          formula: "-Tₖ = (x, -y mod p)",
           points: [
-            { label: "Tk", point: pointFromDto(result.Tk), role: "mask" },
-            { label: "-Tk", point: pointFromDto(result.negativeTk), role: "inverse" },
+            { label: "Tₖ", point: pointFromDto(result.Tk), role: "mask" },
+            { label: "-Tₖ", point: pointFromDto(result.negativeTk), role: "inverse" },
           ],
         },
         {
-          title: "4. Відновлення Tm",
-          formula: "Tm = Tx + (-Tk)",
+          title: "4. Відновлення Tₘ",
+          formula: "Tₘ = Tₓ + (-Tₖ)",
           points: [
-            { label: "Tx", point: pointFromDto(result.Tx), role: "result" },
-            { label: "-Tk", point: pointFromDto(result.negativeTk), role: "inverse" },
-            { label: "Tm", point: pointFromDto(result.Tm), role: "message" },
+            { label: "Tₓ", point: pointFromDto(result.Tx), role: "result" },
+            { label: "-Tₖ", point: pointFromDto(result.negativeTk), role: "inverse" },
+            { label: "Tₘ", point: pointFromDto(result.Tm), role: "message" },
           ],
           line: [pointFromDto(result.Tx), pointFromDto(result.negativeTk)],
         },

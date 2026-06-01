@@ -65,7 +65,7 @@ public class EccDemoService {
     CurveContext context = buildContext(request, commandPoints);
     CommandMapping mapping = findCommand(context, command);
 
-    // Tk masks the command point; Tx is the point transmitted as the cryptogram.
+    // T_k masks the command point; T_x is the point transmitted as the cryptogram.
     BigInteger k;
     EcPoint tk;
     EcPoint tx;
@@ -82,17 +82,17 @@ public class EccDemoService {
         k,
         PointDto.from(tk),
         PointDto.from(tx),
-        "Tx = Tm + kG"
+        "Tₓ = Tₘ + Tₖ"
     );
   }
 
   public DecryptResponse decrypt(CurveRequest request, List<CommandInfo> commandPoints, PointDto txDto, BigInteger k) {
     CurveContext context = buildContext(request, commandPoints);
     if (txDto == null) {
-      throw new IllegalArgumentException("Потрібно передати точку криптограми Tx");
+      throw new IllegalArgumentException("Потрібно передати точку криптограми Tₓ");
     }
     if (txDto.x() == null || txDto.y() == null) {
-      throw new IllegalArgumentException("Координати Tx мають бути числами");
+      throw new IllegalArgumentException("Координати Tₓ мають бути числами");
     }
     if (k == null || k.signum() <= 0) {
       throw new IllegalArgumentException("Скаляр k має бути більшим за 0");
@@ -100,7 +100,7 @@ public class EccDemoService {
 
     EcPoint tx = txDto.toPoint();
     if (!context.curve().contains(tx)) {
-      throw new IllegalArgumentException("Точка Tx не належить заданій еліптичній кривій");
+      throw new IllegalArgumentException("Точка Tₓ не належить заданій еліптичній кривій");
     }
 
     // Decryption subtracts the same masking point by adding its inverse point.
@@ -109,7 +109,7 @@ public class EccDemoService {
     EcPoint tm = context.curve().add(tx, negativeTk);
     CommandMapping mapping = context.byPoint().get(tm);
     if (mapping == null) {
-      throw new IllegalArgumentException("Відновлена точка Tm не відповідає жодній команді з таблиці цієї кривої");
+      throw new IllegalArgumentException("Відновлена точка Tₘ не відповідає жодній команді з таблиці цієї кривої");
     }
 
     return new DecryptResponse(
@@ -120,7 +120,7 @@ public class EccDemoService {
         PointDto.from(tm),
         mapping.command(),
         mapping.m(),
-        "Tm = Tx + (-kG)"
+        "Tₘ = Tₓ + (-Tₖ)"
     );
   }
 
@@ -211,21 +211,21 @@ public class EccDemoService {
     for (CommandName command : COMMANDS) {
       CommandInfo item = byName.get(command.command());
       if (item == null || item.tm() == null || item.tm().x() == null || item.tm().y() == null) {
-        throw new IllegalArgumentException("Для команди " + command.command() + " потрібно задати точку Tm");
+        throw new IllegalArgumentException("Для команди " + command.command() + " потрібно задати точку Tₘ");
       }
 
       EcPoint tm = item.tm().toPoint();
       if (!curve.contains(tm)) {
-        throw new IllegalArgumentException("Точка Tm для " + command.command() + " не належить поточній кривій");
+        throw new IllegalArgumentException("Точка Tₘ для " + command.command() + " не належить поточній кривій");
       }
       if (used.contains(tm)) {
-        throw new IllegalArgumentException("Кілька команд не можуть мати однакову точку Tm");
+        throw new IllegalArgumentException("Кілька команд не можуть мати однакову точку Tₘ");
       }
       if (tm.x().signum() == 0) {
-        throw new IllegalArgumentException("Повідомлення m = Tm.x не може дорівнювати 0");
+        throw new IllegalArgumentException("Повідомлення m = Tₘ.x не може дорівнювати 0");
       }
       if (usedX.contains(tm.x())) {
-        throw new IllegalArgumentException("Кілька команд не можуть мати однакове повідомлення m = Tm.x");
+        throw new IllegalArgumentException("Кілька команд не можуть мати однакове повідомлення m = Tₘ.x");
       }
 
       CommandMapping mapping = new CommandMapping(command.command(), messageFromPoint(tm), tm);
@@ -319,7 +319,7 @@ public class EccDemoService {
         context.subgroupOrder(),
         curve.p().isProbablePrime(20),
         curve.isNonsingular(),
-        "y^2 = x^3 + " + curve.a() + "x + " + curve.b() + " mod " + curve.p(),
+        "y² = x³ + " + curve.a() + "x + " + curve.b() + " mod " + curve.p(),
         commands
     );
   }
