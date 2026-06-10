@@ -165,7 +165,7 @@ public class EccDemoService {
       throw new IllegalArgumentException("p має бути простим числом");
     }
     if (!curve.isNonsingular()) {
-      throw new IllegalArgumentException("Крива є сингулярною: 4a^3 + 27b^2 = 0 mod p");
+      throw new IllegalArgumentException("Крива є сингулярною: 4a³ + 27b² = 0 mod p");
     }
     if (!curve.contains(curve.g())) {
       throw new IllegalArgumentException("Базова точка G не належить заданій кривій");
