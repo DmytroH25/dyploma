@@ -45,24 +45,63 @@ function mod(value, p) {
   return ((value % p) + p) % p;
 }
 
+function quadraticResidues(p) {
+  const residues = new Map();
+  for (let y = 0; y < p; y += 1) {
+    const residue = mod(y * y, p);
+    if (!residues.has(residue)) {
+      residues.set(residue, []);
+    }
+    residues.get(residue).push(y);
+  }
+  return residues;
+}
+
+function yCoordinatesForX(form, residues, x) {
+  const p = integerOrNull(form.p);
+  const a = integerOrNull(form.a);
+  const b = integerOrNull(form.b);
+  const rhs = mod(x * x * x + a * x + b, p);
+  return residues.get(rhs) || [];
+}
+
 function validPointsForCurve(form) {
   const p = integerOrNull(form.p);
   const a = integerOrNull(form.a);
   const b = integerOrNull(form.b);
-  if (!p || p < 5 || p > 1009 || a === null || b === null) {
+  if (!p || p < 5 || p > 16451 || a === null || b === null) {
     return [];
   }
 
   const points = [];
+  const residues = quadraticResidues(p);
   for (let x = 0; x < p; x += 1) {
-    const rhs = mod(x * x * x + a * x + b, p);
-    for (let y = 0; y < p; y += 1) {
-      if (mod(y * y, p) === rhs) {
-        points.push({ x, y });
-      }
+    for (const y of yCoordinatesForX(form, residues, x)) {
+      points.push({ x, y });
     }
   }
   return points;
+}
+
+function displayPoints(points, limit = 1400) {
+  if (points.length <= limit) return points;
+
+  const step = points.length / limit;
+  const sampled = [];
+  for (let index = 0; index < limit; index += 1) {
+    sampled.push(points[Math.floor(index * step)]);
+  }
+  return sampled;
+}
+
+function plotPadding(max) {
+  const digits = String(max).length;
+  return {
+    top: 34,
+    right: 22,
+    bottom: 46,
+    left: Math.max(38, digits * 9 + 18),
+  };
 }
 
 function containsPoint(form, point) {
@@ -412,6 +451,7 @@ function App() {
             </button>
           </div>
 
+
           {error && <div className="error">{error}</div>}
 
           {mode === "encrypt" ? (
@@ -759,23 +799,30 @@ function DecryptionForm({ form, setForm, onSubmit, loading, result }) {
 
 function CurveVisualizer({ curveForm, result, mode }) {
   const [stageIndex, setStageIndex] = useState(0);
+  const [pointMode, setPointMode] = useState("sample");
   const points = useMemo(() => validPointsForCurve(curveForm), [curveForm]);
+  const plottedPoints = useMemo(
+    () => (pointMode === "all" ? points : displayPoints(points)),
+    [pointMode, points]
+  );
   const p = integerOrNull(curveForm.p) || 1;
-  const size = 520;
-  const pad = 34;
-  const plotSize = size - pad * 2;
+  const size = 780;
   const max = Math.max(1, p - 1);
+  const pad = plotPadding(max);
+  const plotWidth = size - pad.left - pad.right;
+  const plotHeight = size - pad.top - pad.bottom;
+  const pointRadius = p > 5000 ? 1.35 : p > 1000 ? 1.7 : 3.2;
 
   useEffect(() => {
     setStageIndex(0);
   }, [result, mode]);
 
   function sx(x) {
-    return pad + (Number(x) / max) * plotSize;
+    return pad.left + (Number(x) / max) * plotWidth;
   }
 
   function sy(y) {
-    return pad + plotSize - (Number(y) / max) * plotSize;
+    return pad.top + plotHeight - (Number(y) / max) * plotHeight;
   }
 
   function pointFromDto(point) {
@@ -846,45 +893,61 @@ function CurveVisualizer({ curveForm, result, mode }) {
     <section className="visualizer">
       <header className="visualizer-head">
         <h2>Покрокові операції на еліптичній кривій (F<sub>p</sub>)</h2>
-        <div className="visualizer-tabs">
-          {stages.map((item, index) => (
+        <div className="visualizer-controls">
+          <div className="visualizer-tabs" aria-label="Крок алгоритму">
+            {stages.map((item, index) => (
+              <button
+                key={item.title}
+                className={index === stageIndex ? "active" : ""}
+                onClick={() => setStageIndex(index)}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </div>
+          <div className="point-mode-tabs" aria-label="Режим точок">
             <button
-              key={item.title}
-              className={index === stageIndex ? "active" : ""}
-              onClick={() => setStageIndex(index)}
+              className={pointMode === "sample" ? "active" : ""}
+              onClick={() => setPointMode("sample")}
             >
-              {index + 1}
+              Вибірка
             </button>
-          ))}
+            <button
+              className={pointMode === "all" ? "active" : ""}
+              onClick={() => setPointMode("all")}
+            >
+              Усі точки
+            </button>
+          </div>
         </div>
       </header>
 
       <div className="visualizer-grid">
         <svg className="curve-canvas" viewBox={`0 0 ${size} ${size}`} role="img">
-          <rect x={pad} y={pad} width={plotSize} height={plotSize} />
+          <rect x={pad.left} y={pad.top} width={plotWidth} height={plotHeight} />
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
             <g key={ratio}>
-              <line x1={pad + ratio * plotSize} y1={pad} x2={pad + ratio * plotSize} y2={pad + plotSize} />
-              <line x1={pad} y1={pad + ratio * plotSize} x2={pad + plotSize} y2={pad + ratio * plotSize} />
+              <line x1={pad.left + ratio * plotWidth} y1={pad.top} x2={pad.left + ratio * plotWidth} y2={pad.top + plotHeight} />
+              <line x1={pad.left} y1={pad.top + ratio * plotHeight} x2={pad.left + plotWidth} y2={pad.top + ratio * plotHeight} />
             </g>
           ))}
 
           {axisTicks.map((tick) => (
             <g className="axis-tick" key={`x-${tick}`}>
-              <line x1={sx(tick)} y1={pad + plotSize} x2={sx(tick)} y2={pad + plotSize + 6} />
-              <text x={sx(tick)} y={pad + plotSize + 23}>{tick}</text>
+              <line x1={sx(tick)} y1={pad.top + plotHeight} x2={sx(tick)} y2={pad.top + plotHeight + 6} />
+              <text x={sx(tick)} y={pad.top + plotHeight + 23}>{tick}</text>
             </g>
           ))}
 
           {axisTicks.map((tick) => (
             <g className="axis-tick" key={`y-${tick}`}>
-              <line x1={pad - 6} y1={sy(tick)} x2={pad} y2={sy(tick)} />
-              <text x={pad - 12} y={sy(tick) + 5}>{tick}</text>
+              <line x1={pad.left - 6} y1={sy(tick)} x2={pad.left} y2={sy(tick)} />
+              <text className="y-tick" x={pad.left - 12} y={sy(tick) + 5}>{tick}</text>
             </g>
           ))}
 
-          {points.map((point) => (
-            <circle key={`${point.x}:${point.y}`} className="curve-point" cx={sx(point.x)} cy={sy(point.y)} r="3.2" />
+          {plottedPoints.map((point) => (
+            <circle key={`${point.x}:${point.y}`} className="curve-point" cx={sx(point.x)} cy={sy(point.y)} r={pointRadius} />
           ))}
 
           {stage.line?.[0] && stage.line?.[1] && (
@@ -921,6 +984,19 @@ function CurveVisualizer({ curveForm, result, mode }) {
               </div>
             ))}
           </div>
+
+          {pointMode === "sample" && plottedPoints.length < points.length && (
+            <p className="plot-note">
+              Для швидкої роботи графіка показано {plottedPoints.length} з {points.length} точок кривої.
+              Точки поточного етапу завжди відображаються повністю.
+            </p>
+          )}
+
+          {pointMode === "all" && (
+            <p className="plot-note">
+              У режимі повного графіка показано всі {points.length} точок кривої.
+            </p>
+          )}
 
           <p>
             Точки кривої показані блакитними маркерами. Поточний етап

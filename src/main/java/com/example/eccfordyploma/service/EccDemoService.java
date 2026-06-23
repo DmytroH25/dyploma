@@ -27,7 +27,7 @@ public class EccDemoService {
   private static final BigInteger DEFAULT_B = BigInteger.ONE;
   private static final EcPoint DEFAULT_G = EcPoint.of(76, 46);
   private static final BigInteger DEFAULT_N = BigInteger.valueOf(81);
-  private static final int MAX_DEMO_P = 1009;
+  private static final int MAX_DEMO_P = 16451;
 
   private static final List<CommandName> COMMANDS = List.of(
       new CommandName("MOVE_FORWARD", 1),
@@ -57,11 +57,7 @@ public class EccDemoService {
     return toCurveInfo(context);
   }
 
-  public EncryptResponse encrypt(
-      CurveRequest request,
-      List<CommandInfo> commandPoints,
-      String command
-  ) {
+  public EncryptResponse encrypt(CurveRequest request, List<CommandInfo> commandPoints, String command) {
     CurveContext context = buildContext(request, commandPoints);
     CommandMapping mapping = findCommand(context, command);
 
@@ -131,10 +127,11 @@ public class EccDemoService {
 
     EllipticCurve curve = createCurve(normalized);
     validateCurve(curve, normalized.n() != null);
+    Map<Integer, List<Integer>> residues = quadraticResidues(curve.p().intValueExact());
     BigInteger subgroupOrder = normalized.n() == null ? computeOrder(curve, curve.g()) : normalized.n();
-    BigInteger pointCount = countPoints(curve);
+    BigInteger pointCount = countPoints(curve, residues);
     Map<String, CommandMapping> byCommand = commandPoints == null || commandPoints.isEmpty()
-        ? buildCommandTable(curve)
+        ? buildCommandTable(curve, residues)
         : buildManualCommandTable(curve, commandPoints);
     Map<EcPoint, CommandMapping> byPoint = new LinkedHashMap<>();
     byCommand.values().forEach(mapping -> byPoint.put(mapping.tm(), mapping));
@@ -185,11 +182,14 @@ public class EccDemoService {
     }
   }
 
-  private Map<String, CommandMapping> buildCommandTable(EllipticCurve curve) {
+  private Map<String, CommandMapping> buildCommandTable(
+      EllipticCurve curve,
+      Map<Integer, List<Integer>> residues
+  ) {
     Map<String, CommandMapping> mappings = new LinkedHashMap<>();
     Set<BigInteger> usedX = new LinkedHashSet<>();
     for (CommandName command : COMMANDS) {
-      EcPoint tm = findNearestPoint(curve, command.preferredX(), usedX);
+      EcPoint tm = findNearestPoint(curve, command.preferredX(), usedX, residues);
       CommandMapping mapping = new CommandMapping(command.command(), messageFromPoint(tm), tm);
       mappings.put(command.command(), mapping);
       usedX.add(tm.x());
@@ -236,25 +236,31 @@ public class EccDemoService {
     return mappings;
   }
 
-  private EcPoint findNearestPoint(EllipticCurve curve, int targetX, Set<BigInteger> usedX) {
+  private EcPoint findNearestPoint(
+      EllipticCurve curve,
+      int targetX,
+      Set<BigInteger> usedX,
+      Map<Integer, List<Integer>> residues
+  ) {
     int p = curve.p().intValueExact();
     for (int distance = 0; distance < p; distance++) {
       List<Integer> candidates = new ArrayList<>();
       int left = targetX - distance;
       int right = targetX + distance;
-      if (left >= 0 && left < p) {
+      if (left > 0 && left < p) {
         candidates.add(left);
       }
-      if (right != left && right >= 0 && right < p) {
+      if (right != left && right > 0 && right < p) {
         candidates.add(right);
       }
 
       for (Integer x : candidates) {
-        for (int y = 0; y < p; y++) {
-          EcPoint point = EcPoint.of(x, y);
-          if (curve.contains(point) && point.x().signum() > 0 && !usedX.contains(point.x())) {
-            return point;
-          }
+        if (usedX.contains(BigInteger.valueOf(x))) {
+          continue;
+        }
+        List<Integer> ys = yCoordinates(curve, residues, x);
+        if (!ys.isEmpty()) {
+          return EcPoint.of(x, ys.get(0));
         }
       }
     }
@@ -290,17 +296,38 @@ public class EccDemoService {
     throw new IllegalArgumentException("Не вдалося обчислити порядок точки G");
   }
 
-  private BigInteger countPoints(EllipticCurve curve) {
+  private BigInteger countPoints(EllipticCurve curve, Map<Integer, List<Integer>> residues) {
     int p = curve.p().intValueExact();
-    int count = 1;
+    long count = 1;
     for (int x = 0; x < p; x++) {
-      for (int y = 0; y < p; y++) {
-        if (curve.contains(EcPoint.of(x, y))) {
-          count++;
-        }
-      }
+      count += yCoordinates(curve, residues, x).size();
     }
     return BigInteger.valueOf(count);
+  }
+
+  private Map<Integer, List<Integer>> quadraticResidues(int p) {
+    Map<Integer, List<Integer>> residues = new LinkedHashMap<>();
+    for (int y = 0; y < p; y++) {
+      int residue = (int) (((long) y * y) % p);
+      residues.computeIfAbsent(residue, ignored -> new ArrayList<>()).add(y);
+    }
+    return residues;
+  }
+
+  private List<Integer> yCoordinates(EllipticCurve curve, Map<Integer, List<Integer>> residues, int x) {
+    int p = curve.p().intValueExact();
+    int rhs = modInt(
+        (long) x * x * x
+            + curve.a().longValue() * x
+            + curve.b().longValue(),
+        p
+    );
+    return residues.getOrDefault(rhs, List.of());
+  }
+
+  private int modInt(long value, int p) {
+    int result = (int) (value % p);
+    return result < 0 ? result + p : result;
   }
 
   private CurveInfoResponse toCurveInfo(CurveContext context) {

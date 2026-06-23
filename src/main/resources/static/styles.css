@@ -24,7 +24,7 @@ body {
 }
 
 main {
-  width: min(1180px, calc(100% - 32px));
+  width: min(1480px, calc(100% - 32px));
   margin: 0 auto;
   padding: 28px 0 44px;
 }
@@ -95,7 +95,7 @@ h1 {
 
 .layout {
   display: grid;
-  grid-template-columns: 390px minmax(0, 1fr);
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 22px;
   margin-top: 22px;
 }
@@ -363,9 +363,25 @@ select:focus {
   line-height: 1.1;
 }
 
+.visualizer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .visualizer-tabs {
   display: flex;
   gap: 6px;
+}
+
+.point-mode-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .visualizer-tabs button {
@@ -382,9 +398,21 @@ select:focus {
   background: var(--accent);
 }
 
+.point-mode-tabs button {
+  min-height: 30px;
+  border-radius: 5px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.point-mode-tabs button.active {
+  color: #ffffff;
+  background: var(--accent);
+}
+
 .visualizer-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 1.05fr) minmax(280px, 0.95fr);
+  grid-template-columns: minmax(640px, 1fr) minmax(260px, 320px);
   gap: 24px;
   padding: 22px;
   align-items: start;
@@ -392,7 +420,8 @@ select:focus {
 
 .curve-canvas {
   width: 100%;
-  max-height: 620px;
+  max-height: none;
+  aspect-ratio: 1 / 1;
   border: 2px solid #5b5f5c;
   background: #fbfcfb;
 }
@@ -424,6 +453,10 @@ select:focus {
   text-anchor: end;
 }
 
+.axis-tick .y-tick {
+  text-anchor: end;
+}
+
 .axis-label {
   font-size: 15px;
 }
@@ -432,6 +465,7 @@ select:focus {
   fill: #ffffff;
   stroke: #a8d4f5;
   stroke-width: 2.2;
+  opacity: 0.82;
 }
 
 .operation-line {
@@ -542,6 +576,25 @@ select:focus {
   line-height: 1.5;
 }
 
+.visualizer-side .plot-note {
+  margin: 0 0 12px;
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+  color: var(--accent-dark);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (max-width: 1260px) {
+  .visualizer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .visualizer-side {
+    padding-top: 0;
+  }
+}
+
 @media (max-width: 900px) {
   main {
     width: min(100% - 24px, 720px);
@@ -554,10 +607,6 @@ select:focus {
 
   .formula-panel {
     max-width: 420px;
-  }
-
-  .visualizer-grid {
-    grid-template-columns: 1fr;
   }
 
   .visualizer-head {
